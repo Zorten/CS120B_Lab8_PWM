@@ -1,16 +1,16 @@
 /*	Author: Zergio Ruvalcaba (zruva002@ucr.edu)
  *	Lab Section:23
- *	Assignment: Lab #8  Exercise #1
+ *	Assignment: Lab #8  Exercise #2
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
  *
- *	Demo Link: https://youtu.be/8QkCdTbstG0
+ *	Demo Link: https://youtu.be/FKYjNUPRKhA
  */
 #include <avr/io.h>
 #ifdef _SIMULATE_
 #include "simAVRHeader.h"
 #endif
-
+#include "../header/timer.h"
 
 void set_PWM(double frequency) {
     static double current_frequency;
@@ -44,98 +44,108 @@ void PWM_off() {
     TCCR3B = 0x00;
 }
 
-enum SM1_States {SM1_Init, SM1_Wait, SM1_C, SM1_D, SM1_E} SM1_State;
+enum SM2_States {SM2_Init, SM2_Off, SM2_On, SM2_Inc, SM2_Dec} SM2_State;
+unsigned char i = 0;
 
-void TickFctThreeTones(){
+void TickFct_Scale(){
 	unsigned char buttons = ~PINA;
-	double C_freq = 261.63;
+	double C4_freq = 261.63;
 	double D_freq = 293.66;
 	double E_freq = 329.63;
+	double F_freq = 349.23;
+	double G_freq = 392.00;
+	double A_freq = 440.00;
+	double B_freq = 493.88;
+	double C5_freq = 523.25;
+	double off = 0;
 
-	switch (SM1_State){
-		case SM1_Init: //transitions
+	double notes[] = {off, C4_freq, D_freq, E_freq, F_freq, G_freq, A_freq, B_freq, C5_freq};
+
+	switch (SM2_State){
+		case SM2_Init: //transitions
 			PORTB = 0;
-			SM1_State = SM1_Wait;
+			i = 0;
+			SM2_State = SM2_Off;
 			break;
 
-		case SM1_Wait:
+		case SM2_Off:
 			if (buttons == 0x00){
-				SM1_State = SM1_Wait;
+				SM2_State = SM2_Off;
 			}
 
 			if (buttons == 0x01){
-				SM1_State = SM1_C;
+				SM2_State = SM2_On;
+				if (i < 8){
+                                	i = i + 1;
+                        	}
 			}
 
-			if (buttons == 0x02){
-				SM1_State = SM1_D;
-			}
-
-			if (buttons == 0x04){
-				SM1_State = SM1_E;
-			}
 
 			break;
 
-		case SM1_C:
+		
+		case SM2_On:
+			if (buttons == 0x00){
+				SM2_State = SM2_On;
+			}
+
 			if (buttons == 0x01){
-				SM1_State = SM1_C;
+				SM2_State = SM2_Off;
 			}
 
-			else{
-				SM1_State = SM1_Wait;
-			}
-			break;
-
-		case SM1_D:
 			if (buttons == 0x02){
-				SM1_State = SM1_D;
+				SM2_State = SM2_Inc;
 			}
 
-			else{
-				SM1_State = SM1_Wait;
+			if (buttons == 0x04){
+				SM2_State = SM2_Dec;
 			}
 			break;
 
-		case SM1_E:
-			if (buttons == 0x04){
-				SM1_State = SM1_E;
-			}
-			
-			else{
-				SM1_State = SM1_Wait;
-			}
+
+		case SM2_Inc:
+			SM2_State = SM2_On;
+			break;
+
+		case SM2_Dec:
+			SM2_State = SM2_On;
 			break;
 
 		default:
-			SM1_State = SM1_Wait;
+			SM2_State = SM2_Init;
 			break;
 	}
 
-	switch (SM1_State){ //actions
-		case SM1_Init:
+	switch (SM2_State){ //actions
+		case SM2_Init:
 			break;
 
-		case SM1_Wait:
-			set_PWM(0);
+		case SM2_Off:
+			i = 0;
 			break;
 
-		case SM1_C:
-			set_PWM(C_freq);
+		case SM2_Inc:
+			if (i < 8){
+				i = i + 1;
+			}
 			break;
 
-		case SM1_D:
-			set_PWM(D_freq);
+		case SM2_Dec:
+			if (i > 1){
+				i = i - 1;
+			}
 			break;
 
-		case SM1_E:
-			set_PWM(E_freq);
+		case SM2_On:
 			break;
 
 		default:
 			break;
 	
 	}
+
+	set_PWM(notes[i]);
+	PORTB = i;
 
 
 }
@@ -145,11 +155,17 @@ int main(void) {
 	/* Insert DDR and PORT initializations */
 	DDRB = 0xFF; PORTB = 0x00;
 	DDRA = 0x00; PORTA = 0xFF;
+
+
 	/* Insert your solution below */
-	SM1_State = SM1_Init;
+	TimerSet(100);
+	TimerOn();
+	SM2_State = SM2_Init;
 	PWM_on();
 	while (1) {
-		TickFctThreeTones();
+		TickFct_Scale();
+		while (!TimerFlag){}
+		TimerFlag = 0;
 	}
 	return 1;
 }
